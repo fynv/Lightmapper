@@ -71,6 +71,7 @@ layout (std140, binding = 1) uniform LightmapRayList
 layout (location = 0) uniform sampler2D uTexNormal;
 layout (location = 1) uniform usamplerBuffer uValidList;
 
+#define PI 3.14159265359
 
 uint InitRandomSeed(uint val0, uint val1)
 {
@@ -96,6 +97,31 @@ float RandomFloat(inout uint seed)
 	return (float(RandomInt(seed) & 0x00FFFFFFu) / float(0x01000000));
 }
 
+
+vec3 RandomDirection(inout uint seed)
+{
+	float z = RandomFloat(seed) * 2.0 - 1.0;
+	float xy = sqrt(1.0 - z*z);
+	float alpha = RandomFloat(seed) * PI * 2.0;
+	return vec3(xy * cos(alpha), xy * sin(alpha), z);
+}
+
+vec3 RandomDiffuse(inout uint seed, in vec3 base_dir)
+{
+	vec3 dir = RandomDirection(seed);
+	float d = dot(dir, base_dir);
+	vec3 c = d * base_dir;
+	vec3 s = dir - c;
+	float z2 = clamp(d * 0.5 + 0.5, 0.0, 1.0);
+	float xy = sqrt(1.0 - z2);	
+	vec3 s_dir =  sqrt(z2) * base_dir;
+	if (length(s)>0.0)
+	{		
+		s_dir += xy * normalize(s);
+	}
+	return s_dir;
+}
+
 void main()
 {
 	ivec2 local_id = ivec3(gl_LocalInvocationID).xy;	
@@ -109,39 +135,8 @@ void main()
 
 	ivec2 texel_coord = ivec2(texelFetch(uValidList, idx_texel_in).xy);
 	vec3 norm = texelFetch(uTexNormal, texel_coord, 0).xyz;
-	vec3 abs_norm = abs(norm);
-	vec3 up;
-	if (abs_norm.x < abs_norm.y)
-	{
-		if (abs_norm.x < abs_norm.z)
-		{
-			up = vec3(1.0, 0.0, 0.0);
-		}
-		else
-		{
-			up = vec3(0.0, 0.0, 1.0);
-		}
-	}
-	else
-	{
-		if (abs_norm.y < abs_norm.z)
-		{
-			up = vec3(0.0, 1.0, 0.0);
-		}
-		else
-		{
-			up = vec3(0.0, 0.0, 1.0);
-		}
-	}
-	vec3 tangent = normalize(cross(norm, up));
-	vec3 bitangent = cross(norm, tangent);
-
 	uint seed = InitRandomSeed(uJitter, idx_texel_out * uNumRays +  idx_ray);
-	float z2 = clamp(RandomFloat(seed), 0.0, 1.0);
-	float xy = sqrt(1.0 - z2);
-	float alpha = RandomFloat(seed) * 3.14159 * 2.0;
-	vec3 scatter_dir = vec3(xy * cos(alpha), xy * sin(alpha), sqrt(z2));
-	g_dir = norm*scatter_dir.z + tangent * scatter_dir.x + bitangent * scatter_dir.y;	
+	g_dir = RandomDiffuse(seed, norm);	
 
 	render();	
 
