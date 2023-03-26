@@ -112,7 +112,7 @@ vec3 RandomDiffuse(inout uint seed, in vec3 base_dir)
 	float d = dot(dir, base_dir);
 	vec3 c = d * base_dir;
 	vec3 s = dir - c;
-	float z2 = clamp(d * 0.5 + 0.5, 0.0, 1.0);
+	float z2 = clamp(abs(d), 0.0, 1.0);
 	float xy = sqrt(1.0 - z2);	
 	vec3 s_dir =  sqrt(z2) * base_dir;
 	if (length(s)>0.0)
